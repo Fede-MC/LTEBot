@@ -1,9 +1,10 @@
-// loader.js - VERSIÓN FINAL CON MÉTODO DE SONDEO (POLLING)
+// loader.js - VERSIÓN FINAL PERSISTENTE CON MUTATION OBSERVER
 (function() {
   
   // Función principal que crea e inyecta el bot.
+  // Ahora la llamaremos cada vez que necesitemos que el bot (re)aparezca.
   function initChatbot() {
-    // Evita que se ejecute más de una vez si algo sale mal
+    // Si el bot ya existe en la página, no hacemos nada.
     if (document.getElementById('chatbot-flotante-container')) {
       return;
     }
@@ -95,9 +96,11 @@
 
     // Inyectar los estilos y el HTML en la página principal
     const styleSheet = document.createElement('style');
-    styleSheet.type = 'text/css';
-    styleSheet.innerText = estilosCss;
-    document.head.appendChild(styleSheet);
+    styleSheet.id = 'chatbot-styles'; // Damos un ID para no duplicar estilos
+    if (!document.getElementById('chatbot-styles')) {
+        styleSheet.innerText = estilosCss;
+        document.head.appendChild(styleSheet);
+    }
     document.body.appendChild(container);
 
     // Añadir el evento de clic a la burbuja
@@ -106,12 +109,28 @@
     });
   }
 
-  // Bucle de sondeo: revisa si la página está lista cada 100ms.
+  // --- LÓGICA DE PERSISTENCIA ---
+  function observeDOM() {
+    // 1. Creamos un "observador" que vigile el <body>
+    const observer = new MutationObserver(function(mutations) {
+      // 2. Cada vez que Moodle cambie el contenido, revisamos si nuestro bot sigue ahí.
+      if (!document.getElementById('chatbot-flotante-container')) {
+        // 3. Si no está, lo volvemos a inyectar.
+        console.log('Chatbot no encontrado, re-inyectando...');
+        initChatbot();
+      }
+    });
+
+    // 4. Le decimos al observador que empiece a vigilar el <body> y todos sus descendientes.
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Bucle de sondeo inicial para la primera carga de la página.
   const intervalId = setInterval(function() {
-    // Cuando document.body exista, la página está lista para ser manipulada.
     if (document.body && document.head) {
-      clearInterval(intervalId); // Detiene el bucle para no ejecutarse más.
-      initChatbot(); // Llama a la función principal.
+      clearInterval(intervalId);
+      initChatbot(); // Llama a la función principal por primera vez.
+      observeDOM();  // Activa el "vigilante" para futuras navegaciones.
     }
   }, 100);
 
